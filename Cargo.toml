@@ -1,0 +1,17 @@
+[package]
+name = "pinetime"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "pinetime"
+test = false
+doctest = false
+bench = false
+
+[profile.release]
+# debug = true
+# opt-level = "s"
+
+
+[dependencies]
