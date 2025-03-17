@@ -7,6 +7,13 @@ use core::{
     panic::PanicInfo,
 };
 
+use embassy_nrf::{
+    gpio::{Level, Output, OutputDrive},
+    Peripherals,
+};
+
+// use embedded_hal::digital::OutputPin;
+
 /// See nrf52 page 25
 const STACK_ADDR: usize = 0x81_0000;
 
@@ -132,25 +139,20 @@ fn main() {
     // return __semihost(SYS_WRITE, args);
     unsafe { ((0x50000000 + 0x518) as *mut u32).write_volatile(0x10000) };
     unsafe { ((0x50000000 + 0x518) as *mut u32).write_volatile(0x1 << 14) };
-    loop {
-        unsafe {
-            ((0x50000000 + 0x50C) as *mut u32).write_volatile(0x10000);
-            ((0x50000000 + 0x50C) as *mut u32).write_volatile(0x1 << 14);
-        }
-        for _ in 0..8_000_000 {
-            unsafe { asm!("nop") }
-        }
-        unsafe {
-            ((0x50000000 + 0x508) as *mut u32).write_volatile(0x10000);
-            ((0x50000000 + 0x508) as *mut u32).write_volatile(0x1 << 14);
-        }
-        for _ in 0..8_000_000 {
-            unsafe { asm!("nop") }
-        }
 
-        // dbg!("hello from pinetime", 1 + 1);
-        print!("hi");
-        println!("sup");
+    let peripherals = unsafe { Peripherals::steal() };
+    let pin = peripherals.P0_16;
+    let mut vibrator = Output::new(pin, Level::High, OutputDrive::Standard);
+    loop {
+        // spim::Pins {};
+        vibrator.set_low();
+        for _ in 0..8_000_000 {
+            unsafe { asm!("nop") }
+        }
+        vibrator.set_high();
+        for _ in 0..8_000_000 {
+            unsafe { asm!("nop") }
+        }
     }
 }
 

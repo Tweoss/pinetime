@@ -15,3 +15,5 @@ bench = false
 
 
 [dependencies]
+# https://github.com/lulf/watchful/blob/main/firmware/Cargo.toml
+embassy-nrf = { version = "0.3", features = ["defmt", "nrf52832", "time-driver-rtc1", "rt", "gpiote", "unstable-pac", "time", "nfc-pins-as-gpio"] }
