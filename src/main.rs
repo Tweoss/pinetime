@@ -173,28 +173,8 @@ fn main() {
     let mut screen = Output::new(peripherals.P0_14, Level::High, OutputDrive::Standard);
 
     vibrator.set_low();
+    println!("calib: {:?}", system_timer.calib.read());
 
-    for i in 0..100 {
-        screen.set_low();
-        for _ in 0..50 {
-            system_timer.set_reload(0xF1111118);
-            system_timer.clear_current();
-            system_timer.enable_counter();
-            while !system_timer.has_wrapped() {}
-        }
-        screen.set_high();
-        system_timer.disable_counter();
-        for _ in 0..50 {
-            system_timer.set_reload(0xF1111118);
-            system_timer.clear_current();
-            system_timer.enable_counter();
-            while !system_timer.has_wrapped() {}
-        }
-        screen.set_low();
-        system_timer.disable_counter();
-    }
-    println!("continued");
-    // Clock::start
     // https://github.com/embassy-rs/embassy/blob/9d672c44d1dccaac039c656bc2986c4fcf9823c9/embassy-nrf/src/lib.rs#L886
     // https://github.com/nrf-rs/nrf-hal/blob/f132dd7966e297ba2132943ad487c68cbd88c6fb/nrf-hal-common/src/clocks.rs#L52
     // let r = embassy_nrf::pac::CLOCK;
@@ -208,8 +188,39 @@ fn main() {
     // r.tasks_lfclkstart().write_value(1);
     // while r.events_lfclkstarted().read() == 0 {}
 
-    // let timer = Timer::new_counter(peripherals.TIMER0);
-    // timer.set_frequency(Frequency::F8MHz);
+    let timer = Timer::new(peripherals.TIMER0);
+    timer.set_frequency(Frequency::F1MHz);
+    timer.start();
+    let cc = timer.cc(1);
+    for _ in 0..10 {
+        screen.set_low();
+        while cc.capture() < 1 << 18 {}
+        timer.clear();
+        screen.set_high();
+        while cc.capture() < 1 << 18 {}
+        timer.clear();
+    }
+
+    for _ in 0..6 {
+        screen.set_low();
+        for _ in 0..3 {
+            system_timer.set_reload(0x00FF_FFFF);
+            system_timer.clear_current();
+            system_timer.enable_counter();
+            while !system_timer.has_wrapped() {}
+        }
+        screen.set_high();
+        system_timer.disable_counter();
+        for _ in 0..3 {
+            system_timer.set_reload(0x00FF_FFFF);
+            system_timer.clear_current();
+            system_timer.enable_counter();
+            while !system_timer.has_wrapped() {}
+        }
+        screen.set_low();
+        system_timer.disable_counter();
+    }
+
     // timer.set_frequency(Frequency::F4MHz);
     // // peripherals.SPI2;
     // let mut config = spim::Config::default();
