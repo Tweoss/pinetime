@@ -58,8 +58,9 @@ _start:
 
 extern "C" {
     pub fn _start();
+    pub static mut RAM_START: u32;
+    pub static mut RAM_SIZE: u32;
     pub static mut __code_start__: u8;
-    // pub static mut _start: u8;
     pub static mut __code_end__: u8;
     pub static mut __data_start__: u8;
     pub static mut __data_end__: u8;
@@ -67,24 +68,26 @@ extern "C" {
     pub static mut __bss_end__: u8;
 }
 
+static mut A_VALUE: [u8; 26] = [0; 26];
+
 #[no_mangle]
 pub unsafe extern "C" fn rsstart() -> ! {
-    // // TODO: move bss somewhere else
-    // // Safety: I *believe* this is sufficient to prevent compiler reorderings.
-    // // https://stackoverflow.com/questions/72823056/how-to-build-a-barrier-by-rust-asm
-    // asm!("");
-    // // Not sure if this is sound.
-    // // Was unable to observe nonzeroed BSS before, so saw no change.
-    // let count = (&raw const __bss_end__).byte_offset_from(&raw const __bss_start__);
+    // Safety: I *believe* this is sufficient to prevent compiler reorderings.
+    // https://stackoverflow.com/questions/72823056/how-to-build-a-barrier-by-rust-asm
+    asm!("");
+    // Not sure if this is sound.
+    // Was unable to observe nonzeroed BSS before, so saw no change.
+    let count = (&raw const __bss_end__).byte_offset_from(&raw const __bss_start__);
 
-    // for index in 0..count {
-    //     // Use assembly instead of a slice copy because rust/LLVM believes that
-    //     // is guaranteed to be undefined => unreachable after.
-    //     let dest = (&raw mut __bss_start__).byte_offset(index * (size_of::<u32>() as isize));
-    //     let source = 0_u32;
-    //     asm!("str {}, [{}]", in(reg) source, in(reg) dest);
-    // }
-    // asm!("");
+    for index in 0..count {
+        // Use assembly instead of a slice copy because rust/LLVM believes that
+        // is guaranteed to be undefined => unreachable after.
+        let dest = (&raw mut __bss_start__).byte_offset(index);
+        let source = 0_u32;
+        asm!("str {}, [{}]", in(reg) source, in(reg) dest);
+    }
+    asm!("");
+
     // interrupt_init();
 
     // //     // now setup timer interrupts.

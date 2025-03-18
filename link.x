@@ -1,8 +1,11 @@
+/* NOTE 1 K = 1 KiBi = 1024 bytes */
+RAM_START = 0x20000000;
+RAM_SIZE = 64K;
+
 MEMORY
 {
-  /* NOTE 1 K = 1 KiBi = 1024 bytes */
   FLASH  (rx)   : ORIGIN = 0x00008020, LENGTH = 256K
-  RAM    (!rx)  : ORIGIN = 0x20000008, LENGTH = 32760
+  RAM    (!rx)  : ORIGIN = RAM_START, LENGTH = RAM_SIZE
 }
 
 SECTIONS
@@ -14,9 +17,16 @@ SECTIONS
     .rodata :       { *(.rodata*) }
     .data :         { *(.data*) }
     __data_end__ = .;
-    __bss_start__ = .;
-    .bss :          { *(.bss*)  *(COMMON) } >RAM
-    __bss_end__ = ALIGN(8);
+    # https://blog.thea.codes/the-most-thoroughly-commented-linker-script/
+    .bss (NOLOAD) :
+    {
+        . = ALIGN(4);
+        __bss_start__ = .;
+        *(.bss*)
+        *(COMMON)
+        . = ALIGN(4);
+        __bss_end__ = .;
+    } >RAM
 }
 
 /* Force link of _start and verify correct position */
