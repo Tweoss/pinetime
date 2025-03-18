@@ -11,15 +11,18 @@ build profile=default-profile:
     path_profile={{ if profile == "dev" { "debug" } else { "release" } }}
     cargo rustc --profile {{profile}} --target thumbv7em-none-eabi -Z build-std="core,compiler_builtins,alloc" -- -C link-arg=-Tlink.x
     # cargo rustc --profile {{profile}} --target thumbv7em-none-eabi.json -Z build-std="core,compiler_builtins,alloc" -- -C link-arg=-Tlink.x
-    arm-none-eabi-objcopy target/thumbv7em-none-eabi/$path_profile/pinetime -O binary target/thumbv7em-none-eabi/$path_profile/pinetime.bin
 
 run profile=default-profile:
     #!/usr/bin/env bash
     set -euxo pipefail
     path_profile={{ if profile == "dev" { "debug" } else { "release" } }}
     # scp target/thumbv7em-none-eabi/$path_profile/pinetime anaktoria@{{anaktoria-ip}}:/home/anaktoria/francis-pinetime/pinetime
-    # scp target/thumbv7em-none-eabi/$path_profile/pinetime.bin anaktoria@{{anaktoria-ip}}:/home/anaktoria/francis-pinetime/pinetime.bin
     just gdb
+
+build-copy-bin:
+    arm-none-eabi-objcopy target/thumbv7em-none-eabi/release/pinetime -O binary target/thumbv7em-none-eabi/release/pinetime.bin
+    scp target/thumbv7em-none-eabi/release/pinetime.bin anaktoria@{{anaktoria-ip}}:/home/anaktoria/francis-pinetime/pinetime.bin
+    ssh anaktoria@{{anaktoria-ip}}
 
 setup-openocd:
     ssh -L 3333:localhost:3333 anaktoria@{{anaktoria-ip}} -t "cd francis-pinetime; bash -l"
