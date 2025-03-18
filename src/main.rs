@@ -4,18 +4,27 @@
 
 use core::{
     arch::{asm, global_asm},
+    marker::PhantomData,
     panic::PanicInfo,
 };
 
+use cortex_m::peripheral::{syst::SystClkSource, SYST};
 use embassy_nrf::{
+    bind_interrupts,
+    config::Config,
     gpio::{Level, Output, OutputDrive},
+    interrupt::typelevel::Handler,
+    pac::clock::Clock,
+    peripherals,
+    spim::{self, Instance, InterruptHandler},
+    timer::{Frequency, Timer},
     Peripherals,
 };
 
 // use embedded_hal::digital::OutputPin;
 
 /// See nrf52 page 25
-const STACK_ADDR: usize = 0x81_0000;
+const STACK_ADDR: usize = 0x81_0000 - 4;
 
 global_asm!(r#"
 .section ".text.start"
@@ -38,7 +47,7 @@ _start:
 
     @ mov sp,         @ initialize stack pointer
     ldr sp, _stack_addr @ initialize stack pointer
-    mov fp, #0          @ clear frame pointer reg.  don't think needed.
+    @ mov fp, #0          @ clear frame pointer reg.  don't think needed.
     bl rsstart          @ we could jump right to rsstart (notmain)
     @ bl _cstart        @ call our code to do initialization.
     _stack_addr: .word {}
@@ -47,23 +56,10 @@ _start:
 "#
 , const STACK_ADDR);
 
-// // 0x50000000 GPIO P0 General purpose input and output
-// // - P0.16/TRACEDATA1 VIBRATOR OUT OUT
-// // OUTSET 0x508 Set individual bits in GPIO port
-// // OUTCLR 0x50C Clear individual bits in GPIO port
-// // DIRSET 0x518 DIR set register
-// unsafe { ((0x5000_0000 + 0x518) as *mut u32).write_volatile(!0x0) };
-// loop {
-//     unsafe {
-//         // ((0x50000000 + 0x50C) as *mut u32).write_volatile(!0x0);
-//         ((0x50000000 + 0x508) as *mut u32).write_volatile(!0x0);
-//     }
-// }
-//
-
 extern "C" {
+    pub fn _start();
     pub static mut __code_start__: u8;
-    pub static mut _start: u8;
+    // pub static mut _start: u8;
     pub static mut __code_end__: u8;
     pub static mut __data_start__: u8;
     pub static mut __data_end__: u8;
@@ -119,6 +115,28 @@ pub unsafe extern "C" fn rsstart() -> ! {
     // rpi_reboot();
 }
 
+struct SpimInterruptHandler<T: Instance> {
+    _phantom: PhantomData<T>,
+}
+
+impl<T: Instance> Handler<T::Interrupt> for SpimInterruptHandler<T> {
+    #[doc = r" Interrupt handler function."]
+    #[doc = r""]
+    #[doc = r" Must be called every time the `I` interrupt fires, synchronously from"]
+    #[doc = r" the interrupt handler context."]
+    #[doc = r""]
+    #[doc = r" # Safety"]
+    #[doc = r""]
+    #[doc = r" This function must ONLY be called from the interrupt handler for `I`."]
+    unsafe fn on_interrupt() {
+        todo!()
+    }
+}
+
+bind_interrupts!(struct Irqs {
+    SPI2 => InterruptHandler<peripherals::SPI2>;
+});
+
 fn main() {
     // 0x50000000 GPIO P0 General purpose input and output
     // - P0.16/TRACEDATA1 VIBRATOR OUT OUT
@@ -137,23 +155,96 @@ fn main() {
     // args[1] = (uint32_t)buffer;
     // args[2] = (uint32_t)length;
     // return __semihost(SYS_WRITE, args);
-    unsafe { ((0x50000000 + 0x518) as *mut u32).write_volatile(0x10000) };
-    unsafe { ((0x50000000 + 0x518) as *mut u32).write_volatile(0x1 << 14) };
+    // unsafe { ((0x50000000 + 0x518) as *mut u32).write_volatile(0x10000) };
+    // unsafe { ((0x50000000 + 0x518) as *mut u32).write_volatile(0x1 << 14) };
 
-    let peripherals = unsafe { Peripherals::steal() };
+    // let peripherals = embassy_nrf::init(Config::default());
+    let peripherals = unsafe { embassy_nrf::Peripherals::steal() };
+    let cm_peripherals = unsafe { cortex_m::Peripherals::steal() };
+    // let cm_peripherals = cortex_m::Peripherals::take().unwrap();
+    let mut system_timer = cm_peripherals.SYST;
+    system_timer.set_clock_source(SystClkSource::Core);
+
     let pin = peripherals.P0_16;
     let mut vibrator = Output::new(pin, Level::High, OutputDrive::Standard);
-    loop {
-        // spim::Pins {};
-        vibrator.set_low();
-        for _ in 0..8_000_000 {
-            unsafe { asm!("nop") }
+    let mut screen = Output::new(peripherals.P0_14, Level::High, OutputDrive::Standard);
+
+    vibrator.set_low();
+
+    for i in 0..100 {
+        screen.set_low();
+        for _ in 0..50 {
+            system_timer.set_reload(0xF1111118);
+            system_timer.clear_current();
+            system_timer.enable_counter();
+            while !system_timer.has_wrapped() {}
         }
-        vibrator.set_high();
-        for _ in 0..8_000_000 {
-            unsafe { asm!("nop") }
+        screen.set_high();
+        system_timer.disable_counter();
+        for _ in 0..50 {
+            system_timer.set_reload(0xF1111118);
+            system_timer.clear_current();
+            system_timer.enable_counter();
+            while !system_timer.has_wrapped() {}
         }
+        screen.set_low();
+        system_timer.disable_counter();
     }
+    println!("continued");
+    // Clock::start
+    // https://github.com/embassy-rs/embassy/blob/9d672c44d1dccaac039c656bc2986c4fcf9823c9/embassy-nrf/src/lib.rs#L886
+    // https://github.com/nrf-rs/nrf-hal/blob/f132dd7966e297ba2132943ad487c68cbd88c6fb/nrf-hal-common/src/clocks.rs#L52
+    // let r = embassy_nrf::pac::CLOCK;
+    // r.tasks_hfclkstart().write_value(1);
+    // while r.events_hfclkstarted().read() == 0 {}
+    // r.events_hfclkstarted().write_value(0);
+
+    // r.lfclksrc()
+    //     .write(|w| w.set_src(embassy_nrf::pac::clock::vals::Lfclksrc::RC));
+    // r.events_lfclkstarted().write_value(0);
+    // r.tasks_lfclkstart().write_value(1);
+    // while r.events_lfclkstarted().read() == 0 {}
+
+    // let timer = Timer::new_counter(peripherals.TIMER0);
+    // timer.set_frequency(Frequency::F8MHz);
+    // timer.set_frequency(Frequency::F4MHz);
+    // // peripherals.SPI2;
+    // let mut config = spim::Config::default();
+    // // https://github.com/tstellanova/cst816s/blob/master/examples/touchpad.rs
+    // config.frequency = spim::Frequency::M8;
+    // config.mode = spim::MODE_3;
+    // config.orc = 122;
+
+    // let mut spi = spim::Spim::new(
+    //     peripherals.SPI2,
+    //     Irqs,
+    //     peripherals.P0_02,
+    //     peripherals.P0_04,
+    //     peripherals.P0_03,
+    //     config,
+    // );
+
+    // spi.blocking_write(&[0u8]);
+
+    // timer.clear();
+    // timer.start();
+
+    // let cc = timer.cc(0);
+    // while cc.capture() == 0 {
+    //     // timer.task_count().trigger();
+    //     println!("{}", cc.capture());
+    // }
+    // // for _ in 0..8_000_000 {
+    // //     unsafe { asm!("nop") }
+    // // }
+    // // for _ in 0..8_000_000 {
+    // //     unsafe { asm!("nop") }
+    // // }
+    // // timer.clear();
+    // while timer.cc(0).read() < 125_000 {
+    //     unsafe { asm!("nop") }
+    // }
+    // // vibrator.set_high();
 }
 
 #[panic_handler]

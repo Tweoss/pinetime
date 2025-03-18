@@ -1,3 +1,10 @@
+MEMORY
+{
+  /* NOTE 1 K = 1 KiBi = 1024 bytes */
+  FLASH  (rx)   : ORIGIN = 0x00008020, LENGTH = 256K
+  RAM    (!rx)  : ORIGIN = 0x20000008, LENGTH = 32760
+}
+
 SECTIONS
 {
     __code_start__ = .;
@@ -8,7 +15,7 @@ SECTIONS
     .data :         { *(.data*) }
     __data_end__ = .;
     __bss_start__ = .;
-    .bss :          { *(.bss*)  *(COMMON) }
+    .bss :          { *(.bss*)  *(COMMON) } >RAM
     __bss_end__ = ALIGN(8);
 }
 

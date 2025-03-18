@@ -10,10 +10,11 @@ doctest = false
 bench = false
 
 [profile.release]
-# debug = true
+debug = true
 # opt-level = "s"
 
 
 [dependencies]
+cortex-m = { version = "0.7.7", features = [ "inline-asm" ] }
 # https://github.com/lulf/watchful/blob/main/firmware/Cargo.toml
-embassy-nrf = { version = "0.3", features = ["defmt", "nrf52832", "time-driver-rtc1", "rt", "gpiote", "unstable-pac", "time", "nfc-pins-as-gpio"] }
+embassy-nrf = { version = "0.3", features = [ "nrf52832", "unstable-pac" ] }
