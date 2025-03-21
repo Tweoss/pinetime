@@ -9,52 +9,74 @@ use core::{
 };
 
 use cortex_m::peripheral::{syst::SystClkSource, SYST};
+use display::Orientation;
 use embassy_nrf::{
     bind_interrupts,
     config::Config,
-    gpio::{Level, Output, OutputDrive},
+    gpio::{Level, Output, OutputDrive, Pin},
     interrupt::typelevel::Handler,
-    pac::clock::Clock,
+    pac::{clock::Clock, SPI0, SPIM0},
     peripherals,
     spim::{self, Instance, InterruptHandler},
+    spis::Polarity,
     timer::{Frequency, Timer},
     Peripherals,
 };
+use timer::Delay;
 
-// use embedded_hal::digital::OutputPin;
+global_asm!(
+    r#"
+.section .text
+.globl Reset
+Reset:
+    @ initialize BSS to zero.
+    ldr r0, =__bss_start__
+    ldr r1, =__bss_end__
+    movs r2, #0
+    0:
+    @ if we've reached the end of bss, exit (jump forward).
+    cmp r1, r0
+    beq 1f
+    @ otherwise, store 0 into address at r0 and increment r0.
+    stm r0!, {{r2}}
+    @ then loop (jump back).
+    b 0b
+    1:
 
-/// See nrf52 page 25
-const STACK_ADDR: usize = 0x81_0000 - 4;
+    @ copy data from flash to RAM.
+    ldr r0, =__data_start__
+    ldr r1, =__data_end__
+    ldr r2, =__la_data_start__
+    0:
+    cmp r1, r0
+    beq 1f
+    ldm r2!, {{r3}}
+    stm r0!, {{r3}}
+    b 0b
+    1:
 
-global_asm!(r#"
-.section ".text.start"
-.globl _start
-_start:
-    @ @ force the mode to be SUPER.
-    @ mov r0,  
-    @ orr r0,r0,#(1<<7)    @ disable interrupts.
-    @ msr cpsr, r0
+    @ Enable the floating point unit (NRF52 has one) by enabling CP10 and CP11
+    @ coprocessors.
+    @ See arm cortex-m4 (7-71) for enabling.
+    ldr r0, =0xE000ED88
+    ldr r1, =(0xF << 20)
+    ldr r2, [r0]
+    orr r2, r2, r1
+    str r2, [r0]
+    @ cortex-m-rt has these barriers.
+    dsb
+    isb
 
-    @ @ prefetch flush
-    @ mov r1, #0;
-    @ mcr p15, 0, r1, c7, c5, 4
-    @ ldr r0, =0x50000518
-    @ mvn r1, #0
-    @ str r1, [r0]
-    @ ldr r0, =0x5000050C
-    @ mvn r1, #0
-    @ str r1, [r0]
+    @ rsstart shouldn't return.
+    bl rsstart
 
-    @ mov sp,         @ initialize stack pointer
-    ldr sp, _stack_addr @ initialize stack pointer
-    @ mov fp, #0          @ clear frame pointer reg.  don't think needed.
-    bl rsstart          @ we could jump right to rsstart (notmain)
-    @ bl _cstart        @ call our code to do initialization.
-    _stack_addr: .word {}
+    udf #0
 
-    @ _interrupt_table_end:   @ end of the table.
+@ Put the address of the reset handler into the vector table.
+.section .vector_table.reset_vector
+    .word Reset
 "#
-, const STACK_ADDR);
+);
 
 extern "C" {
     pub fn _start();

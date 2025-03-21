@@ -9,12 +9,14 @@ test = false
 doctest = false
 bench = false
 
+
 [profile.release]
 debug = true
+panic = "abort"
 # opt-level = "s"
 
 
 [dependencies]
 cortex-m = { version = "0.7.7", features = [ "inline-asm" ] }
 # https://github.com/lulf/watchful/blob/main/firmware/Cargo.toml
-embassy-nrf = { version = "0.3", features = [ "nrf52832", "unstable-pac" ] }
+embassy-nrf = { path = "../embassy/embassy-nrf", features = [ "nrf52832", "unstable-pac" ] }
