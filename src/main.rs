@@ -311,6 +311,7 @@ mod display {
                 cs_pin,
                 reset_pin,
             };
+
             let mut delay_ms = |ms: u32| {
                 delay_source.delay_ms(ms);
             };
@@ -347,18 +348,13 @@ mod display {
         }
 
         fn write_cmd(&mut self, instr: Instruction) {
-            // TODO: unnecessary cs_pin?
-            // self.cs_pin.set_low();
             self.dc_pin.set_low();
             let _ = self.spi.blocking_write(&[instr as u8]);
-            // self.cs_pin.set_high();
         }
 
         fn write_data(&mut self, data: &[u8]) {
-            self.cs_pin.set_low();
             self.dc_pin.set_high();
             let _ = self.spi.blocking_write(data);
-            self.cs_pin.set_high();
         }
 
         pub fn set_orientation(&mut self, orientation: Orientation) {
