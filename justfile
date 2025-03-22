@@ -35,7 +35,7 @@ dump:
     arm-none-eabi-objdump --architecture arm -Mforce-thumb --target binary -D target/thumbv7em-none-eabihf/release/pinetime.bin
 
 gdb:
-    arm-none-eabi-gdb target/thumbv7em-none-eabihf/release/pinetime -ex 'target extended-remote localhost:3333' -ex 'monitor arm semihosting enable' -ex 'set confirm off' -ex 'monitor reset halt' -ex 'load' -ex 'monitor reset run'
+    arm-none-eabi-gdb target/thumbv7em-none-eabihf/release/pinetime -ex 'target extended-remote localhost:3333' -ex 'monitor arm semihosting enable' -ex 'set confirm off' -ex 'monitor reset halt' -ex 'load' -ex 'continue'
 
 build-copy-boot profile=default-profile:
     just build-boot {{profile}}
