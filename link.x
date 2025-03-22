@@ -63,6 +63,7 @@ SECTIONS
 
     .text __start_text__ :
     {
+        *(.text.reset)
         /* All of the code. */
         *(.text .text.*);
     } > FLASH
